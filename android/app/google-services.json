@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "162606190551",
+    "project_id": "medikart-9fed3",
+    "storage_bucket": "medikart-9fed3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:162606190551:android:20e96baba07afaf302c592",
+        "android_client_info": {
+          "package_name": "com.medikart2"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "162606190551-01dnlah4c1b1k7belomjustupusbu5ah.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB2keds4C-pHv9WZm_7QWP5OqSYlVGQAEQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "162606190551-01dnlah4c1b1k7belomjustupusbu5ah.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "162606190551-bathpt120vgirv0tsbos6q9bg5avv27b.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.medikart2"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

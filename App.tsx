@@ -4,34 +4,34 @@
  *
  * @format
  */
+import { View } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Navigation from './Navigation';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import store from './src/store/store'
+import { Provider } from 'react-redux';
+import AppProvider from './src/context/AppProvider';
 
-import { NewAppScreen } from '@react-native/new-app-screen';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+const queryClient = new QueryClient();
 
-function App() {
-  const isDarkMode = useColorScheme() === 'dark';
+function App(): React.JSX.Element {
 
-  return (
-    <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
-    </SafeAreaProvider>
-  );
-}
-
-function AppContent() {
-  const safeAreaInsets = useSafeAreaInsets();
+  const [values,setValues] = useState({isDoctor:false});
 
   return (
-    <View style={styles.container}>
-      <NewAppScreen
-        templateFileName="App.tsx"
-        safeAreaInsets={safeAreaInsets}
-      />
+    <View style={{flex:1}}>
+    <SafeAreaView style={{flex:0,backgroundColor:'#0B3DA9'}}/>
+    <SafeAreaView style={styles.container}>
+      <QueryClientProvider client={queryClient}>
+        <Provider store={store}>
+         <AppProvider values={{values,setValues}}>
+         <Navigation />
+         </AppProvider>
+        </Provider>
+      </QueryClientProvider>
+    </SafeAreaView>
     </View>
   );
 }
@@ -39,7 +39,7 @@ function AppContent() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
+  }
 });
 
 export default App;
