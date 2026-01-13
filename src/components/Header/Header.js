@@ -3,28 +3,13 @@ import React, { useEffect, useState } from 'react'
 import { COLORS } from '../../styles/color'
 import Button from '../Button/Button'
 import { useNavigation } from '@react-navigation/native'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import { useAppContext } from '../../context/AppProvider'
 
 const Header = () => {
 
-  const {navigate} = useNavigation();  
+  const { profile } = useAppContext();  
 
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    const loadUser = async () => {
-        try {
-            const userStr = await AsyncStorage.getItem('currentUser');
-            if (userStr) {
-                const parsed = JSON.parse(userStr);
-                setUser(parsed);
-            }
-        } catch (e) {
-            console.log('[Header] Failed to load user from storage:', e?.message || e);
-        }
-    };
-    loadUser();
-  }, []);
+  const {navigate} = useNavigation(); 
 
   return (
     <View style={styles.container}>
@@ -32,11 +17,20 @@ const Header = () => {
         <View style={{flexDirection:'row'}}>
             <Image 
                 style={styles.image} 
-                source={user?.image ? {uri:user.image} : require('../../assets/img/avatar.png')} 
+                source={profile?.imageUrl ? {uri: profile.imageUrl } : require('../../assets/img/avatar.png')
+            }
+            onError={(e) => 
+                console.log('[Header] Failed to load profile image:', profile?.imageUrl, e?.nativeEvent)
+            }
+            
             />
             <View style={styles.bio}>
-                <Text style={styles.text}>Hello, Welcome</Text>
-                <Text style={[styles.text,{paddingTop:5}]}>{user?.name || 'Username'}</Text>
+                <Text style={styles.text}>Welcome</Text>
+                    <Text style={[styles.text,{paddingTop:5}]}> 
+                        {profile?.firstName || profile?.lastName
+                        ? `${profile?.firstName ?? ''} ${profile?.lastName ?? ''}`.trim()
+                        : 'Loading...'}
+                </Text>
             </View>
         </View>
 
@@ -51,8 +45,6 @@ const Header = () => {
             <Image style={styles.searchImage} source={require('../../assets/img/search.png')}/>
             <Text style={styles.searchText}>{'Search doctor'}</Text>
         </TouchableOpacity>
-      
-
     </View>
   )
 }

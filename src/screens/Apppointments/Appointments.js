@@ -3,7 +3,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchPatientByUserId } from '../../api/patient';
-import { fetchAppointmentByPatientId } from '../../api/appointment';
+import { fetchAppointmentsByPatientId } from '../../api/appointment';
 import SectionHeader from '../../components/SectionHeader/SectionHeader';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { COLORS } from '../../styles/color';
@@ -51,7 +51,7 @@ const Appointments = () => {
   // Fetch appointments for this patient
   const { data: appointments, refetch: refetchAppointments } = useQuery({
     queryKey: ['appointmentsByPatient', patientId],
-    queryFn: () => fetchAppointmentByPatientId(patientId),
+    queryFn: () => fetchAppointmentsByPatientId(patientId),
     enabled: !!patientId,
     refetchOnMount: true,
     staleTime:0,

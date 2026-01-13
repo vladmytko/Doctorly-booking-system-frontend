@@ -15,8 +15,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // ===========================
 import { loginWithCredentials } from '../../api/auth/authService';
 import { COLORS } from '../../styles/color'; // adjust if you have different path/colors
-import GoogleSignIn from '../../components/GoogleSignIn';
 import { authEvents, saveToken } from '../../api/auth/authStorage';
+import { useAppContext } from '../../context/AppProvider';
 
 // ===========================
 // Component: LoginScreen2
@@ -27,9 +27,11 @@ const LoginScreen2 = ({ navigation, route }) => {
   // ---------------------------
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  
+  const { setCurrentUser } = useAppContext();
 
   // Only allow submission when email is filled and password length is at least 6
-  const canSubmit = useMemo(() => email.trim().length > 0 && password.length >= 6, [email, password]);
+  const canSubmit = useMemo(() => email.trim().length > 0 && password.length >= 8, [email, password]);
 
   // ---------------------------
   // Login Mutation Logic
@@ -55,6 +57,8 @@ const LoginScreen2 = ({ navigation, route }) => {
         if (user) {
           await AsyncStorage.setItem('currentUser', JSON.stringify(user));
           console.log('[Login] user:', user);
+
+          setCurrentUser(user);
         } else {
           console.log('[Login] No user object in response');
         }
@@ -146,11 +150,6 @@ const LoginScreen2 = ({ navigation, route }) => {
       >
         {loading ? <ActivityIndicator /> : <Text style={styles.buttonText}>Log in</Text>}
       </TouchableOpacity>
-
-      {/* Uncomment if Google SignIn is needed */}
-      {/* <View style={styles.google_button}>
-            <GoogleSignIn />   
-        </View> */}
 
       {/* Forgot Password Link */}
       <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')} style={styles.linkBtn}>

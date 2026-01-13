@@ -1,7 +1,7 @@
-import axios from "axios";
+import axios from "axios"; // Remove later
 import api from './api';
 import { API_PATH, BASE_URL } from "./constant"
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import AsyncStorage from "@react-native-async-storage/async-storage";    // Remove later
 
 /**
  * Create/Book an appointment
@@ -84,7 +84,7 @@ export const fetchAppointments = async () => {
 
 /**
  * Fetch a appointments by patient id
- */
+ *
 export const fetchAppointmentByPatientId = async (patientId) => {
   if (patientId === undefined || patientId === null || patientId === '') {
     console.warn('fetchAppointmentByPatientId called with invalid patientId:', patientId);
@@ -94,13 +94,35 @@ export const fetchAppointmentByPatientId = async (patientId) => {
     const safeId = encodeURIComponent(String(patientId));
     const token = await AsyncStorage.getItem('accessToken');
     const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
-    console.log('Fetching URL:', `${api.defaults.baseURL}/appointments/patient/${safeId}`);
-    const { data } = await api.get(`/appointments/patient/${safeId}`, { headers });
+    console.log('Fetching URL:', `${api.defaults.baseURL}${API_PATH.APPOINTMENT}/patient-id/${safeId}`);
+    const { data } = await api.get(`${API_PATH.APPOINTMENT}/patient-id/${safeId}`, { headers });
     return data;
   } catch (err) {
+    console.log('[FetchAppointmentByPatientId] Error:', err?.response?.data || err?.message);
     throw err;
   }
 };
+*/
+
+export const fetchAppointmentsByPatientId = async (patientId) => {
+  if (!patientId) throw new Error('Patient id is required');
+
+  try{
+    const safeId = encodeURIComponent(String(patientId));
+    const { data } = await api.get(`${API_PATH.APPOINTMENT}/patient-id/${safeId}`);
+
+    console.log('Fetching URL:', `${api.defaults.baseURL}${API_PATH.APPOINTMENT}/patient-id/${safeId}`);
+    
+    return data;
+  } catch (err) {
+    console.log('[FetchAppointmentByPatientId] Error:', err?.response?.data || err?.message);
+    throw err;
+  }
+  
+
+  
+}
+
 
 /**
  * Fetch a appointments by doctorId 

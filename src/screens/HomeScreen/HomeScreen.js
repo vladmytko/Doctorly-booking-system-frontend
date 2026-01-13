@@ -1,6 +1,5 @@
 import { Image, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import React, { useEffect, useMemo, useState } from 'react'
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Header from '../../components/Header/Header'
 import Categories from '../../components/Categories/Categories'
 import SectionHeader from '../../components/SectionHeader/SectionHeader'
@@ -13,84 +12,74 @@ import { fetchSpecialityById } from '../../api/specialities'
 import dayjs from 'dayjs'
 import Button from '../../components/Button/Button'
 import { useAppContext } from '../../context/AppProvider'
-import { fetchAppointmentByPatientId } from '../../api/appointment'
+import { fetchAppointmentsByPatientId } from '../../api/appointment'
 import { fetchPatientByUserId } from '../../api/patient'
 import { fetchDoctorById } from '../../api/doctors'
 
 const HomeScreen = ({route}) => {
+
+  const { currentUser, setProfile } = useAppContext();
+  const userId = currentUser?.id;
+
   const {navigate} = useNavigation();
-  //const appointments = useSelector((state)=> state.appointment.appointments);
 
-  // Load logged-in user id from AsyncStorage (expects login to store {"id": "..."} under 'currentUser')
-  const [userId, setUserId] = useState(null); 
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem('currentUser');
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          setUserId(parsed?.id || parsed?._id || null);
-        }
-      } catch (e) {
-        console.log('Failed to load currentUser from storage', e);
-      }
-    })();
-  }, []);
 
   // Resolve PatientDTO that corresponds to the logged-in user
   const { data: patient } = useQuery({
     queryKey: ['patientByUser', userId],
     queryFn: () => fetchPatientByUserId(userId),
-    enabled: !!userId,
+    enabled: !!userId, // Converts user id into boolean, userId is false, query will NOT run
   });
   useEffect(() => {
-    if (patient) {
-      console.log('Patient from fetchedPatientByUserId:', patient);
+    if (patient) {      
+      console.log('[HomeScreen] Patient from fetchedPatientByUserId:', patient);
+      setProfile(patient);
     }
-  }, [patient]);
+  }, [patient, setProfile]);
 
-  const patientId = patient?.id || patient?._id || null;
+  const patientId = patient?.id;
 
   // Fetch appointments for this patient
   const { data: appointments } = useQuery({
     queryKey: ['appointmentsByPatient', patientId],
-    queryFn: () => fetchAppointmentByPatientId(patientId),
+    queryFn: () => fetchAppointmentsByPatientId(patientId),
     enabled: !!patientId,
   });
 
   useEffect(() => {
     if (appointments) {
-      console.log('Appointments for patientId', patientId, ':', appointments);
+      console.log('Appointments for patientId', patient.firstName, patient.lastName, ':', appointments);
     }
-  }, [appointments]);
+  }, [appointments, patient]);
 
-  // SELECT the appointment to display on HOME; 
-  // Prefere SCHEDULED over REQUESTED; ignore CANCELED and COMPLETED
-  const appts = Array.isArray(appointments) ? appointments : (appointments?.data || []);
-  
-  const statusIsScheduled = (s) => s === 'SCHEDULED';
-  const statusIsRequested = (s) => s === 'REQUESTED'; 
+  // Appointments endpoint returns a paginated object:
+  // { content: [...], totalElements, totalPages, ... }
+  const appts = Array.isArray(appointments?.content) ? appointments.content : []; 
 
-  const toMillisFromLocalDateOrCreated = (a) => {
-    // 'date' is a LocalDate string like 'YYYY-MM-DD' (may be null)
-    if(a?.date) return dayjs(a.data, 'YYYY-MM-DD').valueOf();
-    // fall back to createdAt so still can sort
-    return a?.createAt ? dayjs(a.createdAt).valueOf() : Number.POSITIVE_INFINITY;
-  };
+  // Closest upcoming appointment:
+  // 1) filter only SCHEDULED
+  // 2) prefer start >= now
+  // 3) pick the smallest start time
+  const nowMs = dayjs().valueOf();
 
-  const sheduledAppts = appts.filter((a) => statusIsScheduled(a?.status));
-  const requestedAppts = appts.filter((a) => statusIsRequested(a?.status));
+  const scheduled = appts
+    .filter((a) => a?.status === 'SCHEDULED' && a?.start)
+    .map((a) => ({
+      ...a,
+      __startMs: dayjs(a.start).valueOf(),
+    }))
+    .filter((a) => Number.isFinite(a.__startMs));
 
-  sheduledAppts.sort((a, b) => 
-    toMillisFromLocalDateOrCreated(a) - toMillisFromLocalDateOrCreated(b)
-  );
+  const upcoming = scheduled.filter((a) => a.__startMs >= nowMs);
 
-  requestedAppts.sort((a,b) => 
-    toMillisFromLocalDateOrCreated(a) - toMillisFromLocalDateOrCreated(b)
-  );
+  const sortByStart = (a, b) => a.__startMs - b.__startMs;
 
-  const firstAppointment = sheduledAppts[0] ?? requestedAppts[0] ?? null;
+  upcoming.sort(sortByStart);
+  scheduled.sort(sortByStart);
+
+  // If there are upcoming scheduled appointments, take the nearest one.
+  // Otherwise, fall back to the earliest scheduled appointment we have.
+  const firstAppointment = (upcoming[0] || scheduled[0]) || null;
 
   // Normilize doctor reference into a string id for the chosen appointment (API uses doctorId)
   const doctorId = firstAppointment?.doctorId;
@@ -102,26 +91,25 @@ const HomeScreen = ({route}) => {
     retry: 0,
   })
 
-  const specialityId = doctorData?.specialityId;
+//   const specialityId = doctorData?.specialityId;
 
-  const { data: speciality } = useQuery({
-    queryKey: ['specialityById', specialityId],
-    queryFn: () => fetchSpecialityById(specialityId),
-    enabled: !! specialityId,
-  });
+//   const { data: speciality } = useQuery({
+//     queryKey: ['specialityById', specialityId],
+//     queryFn: () => fetchSpecialityById(specialityId),
+//     enabled: !! specialityId,
+//   });
 
-  useEffect(() => {
-  console.log("specialityId:", specialityId, "speciality result:", speciality);
-}, [specialityId, speciality]);
+//   useEffect(() => {
+//   console.log("specialityId:", specialityId, "speciality result:", speciality);
+// }, [specialityId, speciality]);
 
-  const specialityTitle = speciality?.title;
+  // const specialityTitle = speciality?.title;
 
   return (
     <ScrollView style={{flex:1,backgroundColor:'white'}}>
     
       <Header />
       <View>
-      {/* <Categories /> */}
       {firstAppointment && doctorId && <View>
         <SectionHeader title={'Appointments'} onPress={()=> navigate('tabNavigator',{screen:'viewAllAppointments'})}/>
         <TouchableOpacity onPress={()=> navigate('viewAppointment',{
@@ -133,7 +121,7 @@ const HomeScreen = ({route}) => {
           <Image source={{ uri: doctorData?.image }} style={styles.doctorImage} />
             <View style={{paddingHorizontal:10}}>
               <Text style={styles.cardText}>{doctorData?.name}</Text>
-              <Text style={styles.cardText}>{specialityTitle}</Text>
+              {/* <Text style={styles.cardText}>{specialityTitle}</Text> */}
             </View>
           </View>
           <View style={{flexDirection:'row',justifyContent:'space-between',marginTop:10,paddingVertical:10}}>
@@ -141,7 +129,7 @@ const HomeScreen = ({route}) => {
                 <Image source={require('../../assets/img/calendar.png')}/>
                 <Text 
                 style={{color:'white',paddingHorizontal:5}}>
-                  {firstAppointment?.date ??  'Wating for date'}
+                  {firstAppointment?.start ? dayjs(firstAppointment.start).format('YYYY-MM-DD HH:mm') : 'Waiting for date'}
                 </Text>
             </View>
             <View style={{flexWrap:'wrap',flexDirection:'row'}}>
@@ -151,8 +139,6 @@ const HomeScreen = ({route}) => {
           </View>
         </TouchableOpacity>
       </View>}
-      <SectionHeader title={'Top Doctors'} onPress={()=> navigate('doctorsList')}/>
-      <DoctorList horizontal/>
       </View>
 
     </ScrollView>

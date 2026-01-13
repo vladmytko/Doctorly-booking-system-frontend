@@ -33,7 +33,7 @@ const Navigation = () => {
    * Runs once on app start
    * Checks if the user is already logged in (be verifying a saved token)
    * Loads the currentUser from AsyncStorage and sets their role
-   * Setd loading to false when initialization is complete - letting the 
+   * Set loading to false when initialization is complete - letting the 
    * app decide which stack to show */ 
   useEffect(() => {
     const checkAuth = async () => {
