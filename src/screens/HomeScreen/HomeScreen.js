@@ -52,8 +52,11 @@ const HomeScreen = ({route}) => {
     }
   }, [appointments, patient]);
 
+
   // Appointments endpoint returns a paginated object:
   // { content: [...], totalElements, totalPages, ... }
+
+  // If appointment content is array, get appointment content and use empty array.
   const appts = Array.isArray(appointments?.content) ? appointments.content : []; 
 
   // Closest upcoming appointment:
@@ -81,15 +84,21 @@ const HomeScreen = ({route}) => {
   // Otherwise, fall back to the earliest scheduled appointment we have.
   const firstAppointment = (upcoming[0] || scheduled[0]) || null;
 
+  
   // Normilize doctor reference into a string id for the chosen appointment (API uses doctorId)
   const doctorId = firstAppointment?.doctorId;
 
   const { data: doctorData } = useQuery({
-    queryKey: ['doctorId', doctorId],
+    queryKey: ['doctorById', doctorId],
     queryFn: () => fetchDoctorById(doctorId),
     enabled: !!doctorId,
     retry: 0,
   })
+  useEffect(() => {
+    if (doctorData) {      
+      console.log('[HomeScreen] Doctor from fetchDoctorById:', doctorData);
+    }
+  }, [doctorData, doctorId]);
 
 //   const specialityId = doctorData?.specialityId;
 
@@ -118,9 +127,17 @@ const HomeScreen = ({route}) => {
             doctor: doctorData
             })} style={styles.cardContainer}>
           <View style={{flexDirection:'row'}}>
-          <Image source={{ uri: doctorData?.image }} style={styles.doctorImage} />
+          <Image 
+            style={styles.doctorImage} 
+            source={doctorData?.imageUrl ? { uri: doctorData.imageUrl } : require('../../assets/img/avatar.png')}
+            
+          
+          onError={(e) => 
+                console.log('[HomeScreenDoctor] Failed to load doctor image:', doctorData?.imageUrl, e?.nativeEvent)
+            }
+          />
             <View style={{paddingHorizontal:10}}>
-              <Text style={styles.cardText}>{doctorData?.name}</Text>
+              <Text style={styles.cardText}>{doctorData?.firstName} {doctorData?.lastName}</Text>
               {/* <Text style={styles.cardText}>{specialityTitle}</Text> */}
             </View>
           </View>

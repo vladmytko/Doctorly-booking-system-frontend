@@ -1,4 +1,5 @@
 import api from './api';
+import { API_PATH } from './constant';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // Optional: local fallback data for offline/dev usage
 // import { doctorsData } from '../data/appContent';
@@ -25,7 +26,7 @@ export const fetchDoctors = async () => {
  * Fetch a single doctor by id
  */
 export const fetchDoctorById = async (id) => {
-  if (id === undefined || id === null || id === '') {
+  if (!id) {
     console.warn('fetchDoctorById called with invalid id:', id);
     throw new Error('Doctor id is required');
   }
@@ -33,8 +34,9 @@ export const fetchDoctorById = async (id) => {
     const safeId = encodeURIComponent(String(id));
     const token = await AsyncStorage.getItem('accessToken');
     const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
-    console.log('Fetching URL:', `${api.defaults.baseURL}/doctors/${safeId}`);
-    const { data } = await api.get(`/doctors/${safeId}`, { headers });
+
+    console.log('Fetching URL:', `${api.defaults.baseURL}${API_PATH.DOCTOR}/by-id/${safeId}`);
+    const { data } = await api.get(`${API_PATH.DOCTOR}/by-id/${safeId}`, { headers });
     return data;
   } catch (err) {
     throw err;
