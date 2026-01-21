@@ -1,69 +1,56 @@
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import React, { useEffect, useState, useCallback } from 'react'
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import React, { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchPatientByUserId } from '../../api/patient';
 import { fetchAppointmentsByPatientId } from '../../api/appointment';
-import SectionHeader from '../../components/SectionHeader/SectionHeader';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { COLORS } from '../../styles/color';
 import { fetchDoctorById } from '../../api/doctors';
 import { fetchSpecialityById } from '../../api/specialities';
-import ConfirmationModal from '../../components/ConfirmationalModal/ConfirmationModal';
+import { useAppContext } from '../../context/AppProvider';
 
 const Appointments = () => {
+  const { navigate } = useNavigation();
 
-  const {navigate} = useNavigation();
+  // Read the profile form context
+  const { profile, currentUser } = useAppContext();
+
   // UI state for filtering & sorting
-  const [selectedStatus, setSelectedStatus] = useState('ALL'); // ALL | REQUESTED | SCHEDULED | COMPLETED | CANCELLED | NO_SHOW
+  const [selectedStatus, setSelectedStatus] = useState('ALL'); // ALL | SCHEDULED | COMPLETED | CANCELLED | NO_SHOW
 
-  // Load logged-in user id from AsyncStorage (expects login to store {"id": "..."} under 'currentUser')
-  const [userId, setUserId] = useState(null);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem('currentUser');
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          setUserId(parsed?.id);
-        }
-      } catch (e) {
-        console.log('Failed to load currentUser from storage', e);
-      }
-    })(); 
-  }, []);
-
-  // Get patientId from userId
-  const { data: patient } = useQuery({
-    queryKey: ['patientByUser', userId],
-    queryFn: () => fetchPatientByUserId(userId),
-    enabled: !!userId,
-  });
-  useEffect(() => {
-    if (patient) {
-      console.log('Patient from fetchedPatientByUserId:', patient);
-    }
-  }, [patient]);
-
-  const patientId = patient?.id;
+  const currentUserId = profile?.id;
 
   // Fetch appointments for this patient
-  const { data: appointments, refetch: refetchAppointments } = useQuery({
-    queryKey: ['appointmentsByPatient', patientId],
-    queryFn: () => fetchAppointmentsByPatientId(patientId),
-    enabled: !!patientId,
+  const { data: appointments } = useQuery({
+    queryKey: ['appointmentsByPatient', currentUserId],
+    queryFn: () => fetchAppointmentsByPatientId(currentUserId),
+    enabled: !!profile?.id,
     refetchOnMount: true,
-    staleTime:0,
+    staleTime: 0,
   });
-
   useEffect(() => {
     if (appointments) {
-      console.log('Appointments for patientId', patientId, ':', appointments);
+      console.log(
+        '[APPOINTMENTS] Appointments for',
+        profile?.firstName,
+        profile?.lastName,
+        ':',
+        appointments,
+      );
     }
-  }, [appointments]);
+  }, [profile?.firstName, profile?.lastName, appointments]);
 
-  const doctorId = Array.isArray(appointments) ? appointments?.[0]?.doctorId : null;
+  const appoinmentList = Array.isArray(appointments?.content)
+    ? appointments.content
+    : [];
+
+  const doctorId = appoinmentList?.[0]?.doctorId ?? null;
 
   const { data: doctor } = useQuery({
     queryKey: ['doctorById', doctorId],
@@ -71,25 +58,24 @@ const Appointments = () => {
     enabled: !!doctorId,
   });
 
-  useEffect(() => {
-    if (doctor) {
-      console.log('Doctor details: ', doctor);
-    }
-  }, [doctor]);
-
+  // useEffect(() => {
+  //   if (doctor) {
+  //     console.log('Doctor details: ', doctor);
+  //   }
+  // }, [doctor]);
 
   const specialityId = doctor?.specialityId;
-  
-    const { data: speciality } = useQuery({
-      queryKey: ['specialityById', specialityId],
-      queryFn: () => fetchSpecialityById(specialityId),
-      enabled: !! specialityId,
-    });
-  
-    useEffect(() => {
-    console.log("specialityId:", specialityId, "speciality result:", speciality);
-  }, [specialityId, speciality]);
-  
+
+  const { data: speciality } = useQuery({
+    queryKey: ['specialityById', specialityId],
+    queryFn: () => fetchSpecialityById(specialityId),
+    enabled: !!specialityId,
+  });
+
+  //   useEffect(() => {
+  //   console.log("specialityId:", specialityId, "speciality result:", speciality);
+  // }, [specialityId, speciality]);
+
   const queryClient = useQueryClient();
 
   // Whenever the Appointments screen comes into focus (user navigates back here),
@@ -97,33 +83,31 @@ const Appointments = () => {
   // That tells React Query that the cached data is stale and triggers a refetch,
   // ensuring the list of appointments is always up-to-date when the user returns.
   useFocusEffect(
+    // Runs every time this screen becomes acrive
     React.useCallback(() => {
-      if(patient) {
+      if (profile) {
         queryClient.invalidateQueries({
-          queryKey:['appointmentsByPatient', patientId]
+          queryKey: ['appointmentsByPatient', profile?.id],
         });
       }
-    }, [patientId, queryClient])
+    }, [profile, queryClient]),
   );
 
   // --- Derived data: filtered & sorted appointments ---
-  const statusFilter = (list) => {
+  // Filter appointments by the status.
+  const statusFilter = list => {
     if (!Array.isArray(list)) return [];
     if (selectedStatus === 'ALL') return list;
     return list.filter(a => a?.status === selectedStatus);
   };
 
-  const parseDateTime = (a) => {
-    // Expecting fields like a.date = '2025-09-27', a.time = '16:30:00'
-    try {
-      const iso = a?.date ? `${a.date}${a?.time ? 'T'+a.time : 'T00:00:00'}` : null;
-      return iso ? new Date(iso) : null;
-    } catch {
-      return null;
-    }
+  const parseDateTime = a => {
+    if (!a?.start) return null;
+    const d = new Date(a.start);
+    return isNaN(d.getTime()) ? null : d;
   };
 
-  const sortAppointments = (list) => {
+  const sortAppointments = list => {
     const now = new Date();
     return [...list].sort((x, y) => {
       const dx = parseDateTime(x);
@@ -133,7 +117,7 @@ const Appointments = () => {
       const xFuture = dx && dx >= now;
       const yFuture = dy && dy >= now;
 
-      if (selectedStatus === 'SCHEDULED' || (xFuture || yFuture)) {
+      if (selectedStatus === 'SCHEDULED' || xFuture || yFuture) {
         if (dx && dy) return dx - dy; // asc
       }
 
@@ -145,49 +129,115 @@ const Appointments = () => {
     });
   };
 
-  const filteredAppointments = sortAppointments(statusFilter(appointments || []));
+  const filteredAppointments = sortAppointments(
+    statusFilter(appoinmentList || []),
+  );
+
+  const getStatusColor = status => {
+    switch(status) {
+      case 'SCHEDULED':
+        return '#2F80ED';
+      case 'ATTENDED':
+        return '#27AE60';
+      case 'CANCELLED':
+        return '#EB5757';
+      case 'NO_SHOW':
+        return '#828282';  
+    }
+  }
 
   return (
-    <ScrollView style={{flex:1 , backgroundColor: 'white'}}>
+    <ScrollView style={{ flex: 1, backgroundColor: 'white' }}>
       {/* Filters */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterBar} contentContainerStyle={{paddingHorizontal:10}}>
-        {['ALL','REQUESTED','SCHEDULED','COMPLETED','CANCELLED','NO_SHOW'].map((st) => (
-          <TouchableOpacity key={st} onPress={() => setSelectedStatus(st)} style={[styles.chip, selectedStatus === st && styles.chipSelected]}>
-            <Text style={[styles.chipText, selectedStatus === st && styles.chipTextSelected]}>{st === 'ALL' ? 'All' : st}</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterBar}
+        contentContainerStyle={{ paddingHorizontal: 10 }}
+      >
+        {['ALL', 'SCHEDULED', 'ATTENDED', 'CANCELLED', 'NO_SHOW'].map(st => (
+          <TouchableOpacity
+            key={st}
+            onPress={() => setSelectedStatus(st)}
+            style={[styles.chip, selectedStatus === st && styles.chipSelected]}
+          >
+            <Text
+              style={[
+                styles.chipText,
+                selectedStatus === st && styles.chipTextSelected,
+              ]}
+            >
+              {st === 'ALL' ? 'All' : st}
+            </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
-      {Array.isArray(filteredAppointments) && filteredAppointments.length > 0 ? (
+
+      {Array.isArray(filteredAppointments) &&
+      filteredAppointments.length > 0 ? (
         filteredAppointments.map((appt, idx) => (
           <TouchableOpacity
-            key={idx.toString()}
-            onPress={() => navigate('viewAppointment', {  
-              appointmentId: appt?.id,
-              patient: patient,
-              doctor: doctor })}   //appointmentId: appt.id ,
+            key={appt?.id ?? idx.toString()}
+            onPress={() =>
+              navigate('viewAppointment', {
+                appointmentId: appt?.id,
+                patient: profile,
+                doctor: doctor,
+              })
+            } //appointmentId: appt.id ,
             style={styles.cardContainer}
           >
-            <View style={{flexDirection:'row'}}>
-              <Image source={{ uri: doctor?.image }} style={styles.doctorImage} />
-              <View style={{marginHorizontal:10, flexDirection:'row'}}>
-                <Text style={styles.cardText}>{doctor?.name}</Text>
-                <Text style={[styles.cardText, {marginLeft: 38}]}>{speciality?.title}</Text>
-              </View>               
-            </View>
-           
-            <View style={{flexDirection:'row',justifyContent:'space-between',marginTop:2,paddingVertical:10}}>
-              <View style={{flexWrap:'wrap',flexDirection:'row'}}>
-                  <Text style={styles.cardText}>Date: {appt?.date ? String(appt?.date) : 'Waiting for doctor'}</Text>
-              </View>
-              <View style={{flexWrap:'wrap',flexDirection:'row'}}>
-                <Text style={styles.cardText}>Status: {appt?.status}</Text>
-                {/* appt?.time ? String(appt?.time) : "Waiting for doctor" */}
-              </View>
-              </View>
+            <View style={styles.cardRow}>
+              <Image
+                style={styles.doctorImage}
+                source={
+                  doctor?.imageUrl
+                    ? { uri: doctor.imageUrl }
+                    : require('../../assets/img/avatar.png')
+                }
+                onError={e =>
+                  console.log(
+                    '[APPOINTMENTS]: Image for doctor ',
+                    doctor?.firstName,
+                    doctor?.lastName,
+                    'does not show. ',
+                    e?.nativeEvent,
+                  )
+                }
+              />
 
+              <View style={styles.cardRight}>
+                <Text style={styles.doctorName}>
+                  {doctor?.firstName} {doctor?.lastName}
+                </Text>
+
+                <Text style={styles.cardText}>{speciality?.title}</Text>
+
+                <Text style={styles.cardText}>
+                  {appt?.start
+                    ? `${new Date(appt.start).toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: 'short',
+                      })}, ${new Date(appt.start).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}–${appt.end
+                        ? new Date(appt.end).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                        : 'N/A'}`
+                    : 'Waiting for doctor'}
+                </Text>
+              </View>
+            </View>
             
-              
-             
+            <View style={[styles.cardStatusBadge, { backgroundColor:getStatusColor(appt?.status) },]}>
+                <Text style={styles.cardStatusBadgeText}>
+                  {appt?.status === 'SHEDULED' ? 'Waiting' : appt?.status}
+                </Text>
+            </View>              
+            
           </TouchableOpacity>
         ))
       ) : (
@@ -196,30 +246,61 @@ const Appointments = () => {
         </View>
       )}
     </ScrollView>
-  )
-}
+  );
+};
 
-export default Appointments
+export default Appointments;
 
 const styles = StyleSheet.create({
-  cardContainer:{backgroundColor:COLORS.PRIMARY,
-    height:140,
-    marginHorizontal:10,
-    borderRadius:10,
-    padding:15,
-    marginVertical:10,
+  cardContainer: {
+    backgroundColor: COLORS.PRIMARY,
+    marginHorizontal: 10,
+    borderRadius: 15,
+    padding: 15,
+    marginVertical: 10,
+    position:'relative'
   },
-  doctorImage:{
-    height:80,
-    width:72,
-    borderRadius:10,
+  doctorImage: {
+    height: 100,
+    width: 90,
+    borderRadius: 10,
+  },
+  cardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cardRight: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  doctorName: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  cardText: {
+    color: 'white',
+    fontSize: 16,
+    paddingVertical: 3,
+  },
+  cardStatusBadge: {
+    position: 'absolute',
+    right: 15,
+    bottom: 15,
+    paddingHorizontal: 14, 
+    paddingVertical: 8,
+    borderRadius: 18,
+  },
+  cardStatusBadgeText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '700',
+  },
 
-  },
-  cardText:{
-    color:'white',
-    fontSize:16,
-    paddingVertical:3
-  },
+
+
+
   filterBar: {
     paddingVertical: 10,
   },
@@ -243,5 +324,5 @@ const styles = StyleSheet.create({
   chipTextSelected: {
     color: 'white',
     fontWeight: '600',
-  }
-})
+  },
+});
