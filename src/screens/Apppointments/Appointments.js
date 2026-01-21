@@ -6,13 +6,17 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import React, { useEffect, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import React, { useEffect, useState, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
+import { fetchPatientByUserId } from '../../api/patient';
 import { fetchAppointmentsByPatientId } from '../../api/appointment';
+import SectionHeader from '../../components/SectionHeader/SectionHeader';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { COLORS } from '../../styles/color';
 import { fetchDoctorById } from '../../api/doctors';
 import { fetchSpecialityById } from '../../api/specialities';
+import ConfirmationModal from '../../components/ConfirmationalModal/ConfirmationModal';
 import { useAppContext } from '../../context/AppProvider';
 
 const Appointments = () => {
@@ -46,35 +50,9 @@ const Appointments = () => {
     }
   }, [profile?.firstName, profile?.lastName, appointments]);
 
-  const appoinmentList = Array.isArray(appointments?.content)
+  const appointmentList = Array.isArray(appointments?.content)
     ? appointments.content
     : [];
-
-  const doctorId = appoinmentList?.[0]?.doctorId ?? null;
-
-  const { data: doctor } = useQuery({
-    queryKey: ['doctorById', doctorId],
-    queryFn: () => fetchDoctorById(doctorId),
-    enabled: !!doctorId,
-  });
-
-  // useEffect(() => {
-  //   if (doctor) {
-  //     console.log('Doctor details: ', doctor);
-  //   }
-  // }, [doctor]);
-
-  const specialityId = doctor?.specialityId;
-
-  const { data: speciality } = useQuery({
-    queryKey: ['specialityById', specialityId],
-    queryFn: () => fetchSpecialityById(specialityId),
-    enabled: !!specialityId,
-  });
-
-  //   useEffect(() => {
-  //   console.log("specialityId:", specialityId, "speciality result:", speciality);
-  // }, [specialityId, speciality]);
 
   const queryClient = useQueryClient();
 
@@ -101,40 +79,113 @@ const Appointments = () => {
     return list.filter(a => a?.status === selectedStatus);
   };
 
-  const parseDateTime = a => {
-    if (!a?.start) return null;
-    const d = new Date(a.start);
-    return isNaN(d.getTime()) ? null : d;
-  };
+  const parseDate = appt => (appt?.start ? new Date(appt.start) : null);
 
   const sortAppointments = list => {
     const now = new Date();
-    return [...list].sort((x, y) => {
-      const dx = parseDateTime(x);
-      const dy = parseDateTime(y);
+    const safe = Array.isArray(list) ? list : [];
 
-      // Upcoming (scheduled in future) first by earliest date
-      const xFuture = dx && dx >= now;
-      const yFuture = dy && dy >= now;
+    // helper: safe time value
+    const time = a => {
+      const d = parseDate(a);
+      return d && !isNaN(d.getTime()) ? d.getTime() : null;
+    };
 
-      if (selectedStatus === 'SCHEDULED' || xFuture || yFuture) {
-        if (dx && dy) return dx - dy; // asc
+    // helpers for sorting (null-safe)
+    const asc = (a, b) => {
+      const ta = time(a);
+      const tb = time(b);
+      if (ta == null && tb == null) return 0;
+      if (ta == null) return 1;
+      if (tb == null) return -1;
+      return ta - tb;
+    };
+
+    const desc = (a, b) => {
+      const ta = time(a);
+      const tb = time(b);
+      if (ta == null && tb == null) return 0;
+      if (ta == null) return 1;
+      if (tb == null) return -1;
+      return tb - ta;
+    };
+
+    // Special rule only for ALL
+    if (selectedStatus === 'ALL') {
+      const upcomingScheduled = [];
+      const rest = [];
+
+      for (const appt of safe) {
+        const d = parseDate(appt);
+        const isUpcoming = d && d >= now;
+        const isScheduled = appt?.status === 'SCHEDULED';
+
+        if (isScheduled && isUpcoming) upcomingScheduled.push(appt);
+        else rest.push(appt);
       }
 
-      // Otherwise newest first
-      if (dx && dy) return dy - dx; // desc
-      if (dx && !dy) return -1;
-      if (!dx && dy) return 1;
-      return 0;
-    });
+      upcomingScheduled.sort(asc); // soonest first
+      rest.sort(desc); // most recent first
+
+      return [...upcomingScheduled, ...rest];
+    }
+
+    // Other filters
+    if (selectedStatus === 'SCHEDULED') return [...safe].sort(asc);
+    return [...safe].sort(desc);
   };
 
   const filteredAppointments = sortAppointments(
-    statusFilter(appoinmentList || []),
+    statusFilter(appointmentList || []),
   );
 
+  // --- Doctor caching per appointment (max ~20 per page) ---
+  const doctorIds = Array.from(
+    new Set((filteredAppointments || []).map(a => a?.doctorId).filter(Boolean)),
+  );
+
+  const doctorQueries = useQueries({
+    queries: doctorIds.map(id => ({
+      queryKey: ['doctorById', id],
+      queryFn: () => fetchDoctorById(id),
+      enabled: !!id,
+      // Doctors rarely change; cache aggressively
+      staleTime: 24 * 60 * 60 * 1000, // 1 day
+    })),
+  });
+
+  const doctorsById = doctorQueries.reduce((acc, q, idx) => {
+    const id = doctorIds[idx];
+    if (id && q?.data) acc[id] = q.data;
+    return acc;
+  }, {});
+
+  // Optional: speciality caching (also rare)
+  const specialityIds = Array.from(
+    new Set(
+      doctorIds
+        .map(id => doctorsById[id]?.specialityId)
+        .filter(Boolean),
+    ),
+  );
+
+  const specialityQueries = useQueries({
+    queries: specialityIds.map(id => ({
+      queryKey: ['specialityById', id],
+      queryFn: () => fetchSpecialityById(id),
+      enabled: !!id,
+      staleTime: 24 * 60 * 60 * 1000, // 1 day
+    })),
+  });
+
+  const specialitiesById = specialityQueries.reduce((acc, q, idx) => {
+    const id = specialityIds[idx];
+    if (id && q?.data) acc[id] = q.data;
+    return acc;
+  }, {});
+
   const getStatusColor = status => {
-    switch(status) {
+    switch (status) {
       case 'SCHEDULED':
         return '#2F80ED';
       case 'ATTENDED':
@@ -142,9 +193,11 @@ const Appointments = () => {
       case 'CANCELLED':
         return '#EB5757';
       case 'NO_SHOW':
-        return '#828282';  
+        return '#F2994A';
+      default:
+        return '#828282';
     }
-  }
+  };
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: 'white' }}>
@@ -175,7 +228,13 @@ const Appointments = () => {
 
       {Array.isArray(filteredAppointments) &&
       filteredAppointments.length > 0 ? (
-        filteredAppointments.map((appt, idx) => (
+        filteredAppointments.map((appt, idx) => {
+          const doctor = doctorsById[appt?.doctorId];
+          const speciality = doctor?.specialityId
+            ? specialitiesById[doctor.specialityId]
+            : null;
+
+          return (
           <TouchableOpacity
             key={appt?.id ?? idx.toString()}
             onPress={() =>
@@ -208,10 +267,14 @@ const Appointments = () => {
 
               <View style={styles.cardRight}>
                 <Text style={styles.doctorName}>
-                  {doctor?.firstName} {doctor?.lastName}
+                  {doctor
+                    ? `${doctor?.firstName ?? ''} ${doctor?.lastName ?? ''}`.trim()
+                    : 'Doctor'}
                 </Text>
 
-                <Text style={styles.cardText}>{speciality?.title}</Text>
+                <Text style={styles.doctorSpeciality}>
+                  {speciality?.title ?? 'Speciality'}
+                </Text>
 
                 <Text style={styles.cardText}>
                   {appt?.start
@@ -234,12 +297,13 @@ const Appointments = () => {
             
             <View style={[styles.cardStatusBadge, { backgroundColor:getStatusColor(appt?.status) },]}>
                 <Text style={styles.cardStatusBadgeText}>
-                  {appt?.status === 'SHEDULED' ? 'Waiting' : appt?.status}
+                  {appt?.status}
                 </Text>
             </View>              
             
           </TouchableOpacity>
-        ))
+          );
+        })
       ) : (
         <View style={{ padding: 16 }}>
           <Text>No appointments yet.</Text>
@@ -278,6 +342,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 2,
+  },
+  doctorSpeciality: {
+    color: 'white',
+    fontSize: 16,
+    opacity: 0.9,
+    marginBottom: 6,
   },
   cardText: {
     color: 'white',
