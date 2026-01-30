@@ -7,16 +7,12 @@ import {
   View,
 } from 'react-native';
 import React, { useEffect, useState, useCallback } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
-import { fetchPatientByUserId } from '../../api/patient';
 import { fetchAppointmentsByPatientId } from '../../api/appointment';
-import SectionHeader from '../../components/SectionHeader/SectionHeader';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { COLORS } from '../../styles/color';
 import { fetchDoctorById } from '../../api/doctors';
 import { fetchSpecialityById } from '../../api/specialities';
-import ConfirmationModal from '../../components/ConfirmationalModal/ConfirmationModal';
 import { useAppContext } from '../../context/AppProvider';
 
 const Appointments = () => {

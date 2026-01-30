@@ -1,6 +1,6 @@
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native'
 import React from 'react'
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchDoctorById } from '../../api/doctors';
 import DoctorCard from '../../components/DoctorList/DoctorCard';
 import { metricsDoctor } from './constant';
