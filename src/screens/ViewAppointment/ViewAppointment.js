@@ -1,18 +1,19 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native'
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ScrollView, StyleSheet, Text, View, Image } from 'react-native';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import DoctorCard from '../../components/DoctorList/DoctorCard';
 import Button from '../../components/Button/Button';
 import { COLORS } from '../../styles/color';
-import { cancelAppointmentByAppointmentId, fetchAppointmentById, fetchAppointments } from '../../api/appointment';
+import { fetchAppointmentById } from '../../api/appointment';
 import ConfirmationModal from '../../components/ConfirmationalModal/ConfirmationModal';
 import { fetchDoctorById } from '../../api/doctors';
 import { fetchSpecialityById } from '../../api/specialities';
+import { dateTimeFormatter } from '../../components/DateTimeFormatter/DateTimeFormatter'
+import { fetchClinicById } from '../../api/clinic'
 
-const ViewAppointment = ({route}) => {
-
+const ViewAppointment = ({ route }) => {
   const { appointmentId } = route.params;
-  
+
   // React Query will:
   // Not refetch if data in fresh
   // Use cache automatically
@@ -24,19 +25,19 @@ const ViewAppointment = ({route}) => {
 
   const { data: appointment } = useQuery({
     queryKey: ['appointmentsById', appointmentId],
-    queryFn: ()=> fetchAppointmentById(appointmentId),
+    queryFn: () => fetchAppointmentById(appointmentId),
     enabled: !!appointmentId,
     staleTime: 60_000,
-  })
+  });
 
   const doctorId = appointment?.doctorId;
 
   const { data: doctor } = useQuery({
     queryKey: ['doctorById', doctorId],
-    queryFn: ()=> fetchDoctorById(doctorId),
+    queryFn: () => fetchDoctorById(doctorId),
     enabled: !!doctorId,
     staleTime: 60_000,
-  })
+  });
 
   const specialityId = doctor?.specialityId;
 
@@ -45,65 +46,87 @@ const ViewAppointment = ({route}) => {
     queryFn: () => fetchSpecialityById(specialityId),
     enabled: !!specialityId,
     staleTime: 60_000,
-  })
+  });
 
-  console.log('appointmentId params:', appointment);
-  console.log('patient params:', );
-  console.log('doctor params:', doctor);
-  console.log('specilaity params:', speciality);
+  const clinicId = doctor?.clinicId;
 
+  const { data: clinic } = useQuery({
+    queryKey: ['clinicById', clinicId],
+    queryFn: () => fetchClinicById(clinicId),
+    enabled: !!clinicId,
+    staleTime: 60_000,
+  });
+
+  console.log('[ViewAppointment]: appointmentId params:', appointment);
+  console.log('[ViewAppointment]: doctor params:', doctor);
+  console.log('[ViewAppointment]: specilaity params:', speciality);
+  console.log('[ViewAppointment]: clinic params:', clinic);
+  
   const [displayModal, setDisplayModal] = useState(false);
 
-
-
   return (
-    <View style={{flex:1}}>
+    <View style={{ flex: 1 }}>
       <ScrollView style={styles.container}>
-      <View>
-        <DoctorCard {...doctor} style={{width:'100%'}} imageStyle={{height:280}} displayAll/>
-      </View>
-      
-      
-       
-      <Text style={{fontSize:18, paddingVertical:10,fontWeight:'500'}}>{'Appointment Details'}</Text>
-      {/* <Text style={{fontSize:16, paddingVertical:10,fontWeight:'500'}}>Name: {patient?.name}</Text> */}
-      <Text style={{fontSize:16, paddingVertical:10,fontWeight:'500'}}>ID: {}</Text> 
-      <View style={{flexDirection: 'row',flexWrap:'wrap',justifyContent:'space-between',paddingVertical:10}}>
-        <Text style={{fontSize:16, paddingVertical:10,fontWeight:'500'}}>Concern: {appointment?.concern}</Text>
-      </View>
-      <Text style={{fontSize:16, paddingVertical:10,fontWeight:'500'}}>Status: {appointment?.status}</Text>
-      <Text style={{fontSize:16, paddingVertical:10,fontWeight:'500'}}>Time: {appointment?.time || 'Waiting for confirmation'}</Text>
-      <Text style={{fontSize:16, paddingVertical:10,fontWeight:'500'}}>Date: {appointment?.date || 'Waiting for confirmation'}</Text>
-      
-    </ScrollView>
-    <View style={{position:'absolute',bottom:0,width:'100%',padding:10}}>
-          <Button  style={{backgroundColor:COLORS.PRIMARY}}>
-          <View style={{flexDirection:'row',alignItems:'center',gap:2}}>
-            <Text style={{color:'white',fontSize:16}}></Text>
+        <Image style= {styles.doctorImage} 
+               source={doctor?.imageUrl ? {uri: doctor.imageUrl} : require('../../assets/img/avatar.png')} />
+
+        <Text style={styles.title}>{'Appointment Details'}</Text>
+        <Text style={{ fontSize: 16, paddingVertical: 10, fontWeight: '500' }}>
+          Dr {doctor?.firstName} {doctor?.lastName}
+        </Text>
+        <Text style={styles.text}>Concern: {appointment?.concern}</Text>
+        <Text style={styles.text}>Status: {appointment?.status}</Text>
+        <Text style={styles.text}>
+          {dateTimeFormatter(appointment?.start, appointment?.end)}
+        </Text>
+      </ScrollView>
+      <View
+        style={{ position: 'absolute', bottom: 0, width: '100%', padding: 10 }}
+      >
+        <Button style={{ backgroundColor: COLORS.PRIMARY }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+            <Text style={{ color: 'white', fontSize: 16 }}></Text>
           </View>
         </Button>
       </View>
 
-       {/* <ConfirmationModal modalText={`Appointment with ${doctor?.name} is canceled`} onClose={()=> setDisplayModal(false)} visible={displayModal}/> */}
+      {/* <ConfirmationModal modalText={`Appointment with ${doctor?.name} is canceled`} onClose={()=> setDisplayModal(false)} visible={displayModal}/> */}
     </View>
-  )
-}
+  );
+};
 
-export default ViewAppointment
+export default ViewAppointment;
 
 const styles = StyleSheet.create({
-    container:{
-        flex:1,
-        backgroundColor:'white',
-        padding:20
-    },
-    imageContainer:{
-      borderRadius:'50%',
-      backgroundColor:'#EDEDFC',
-      height:42,
-      width:42,
-      alignItems:'center',
-      justifyContent:'center',
-      marginBottom: 5
-    }
-})
+  container: {
+    flex: 1,
+    backgroundColor: 'white',
+    padding: 20,
+  },
+  imageContainer: {
+    borderRadius: '50%',
+    backgroundColor: '#EDEDFC',
+    height: 42,
+    width: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 5,
+  },
+  title:{
+    fontSize:20,
+    fontWeight: '800'
+  },
+  text: {
+    fontSize: 16,
+    paddingVertical: 10,
+    fontWeight: '500',
+  },
+  doctorImage:{
+    height:320,
+    width: '100%',
+    maxHeight: '100%',
+    borderTopLeftRadius:10,
+    borderTopRightRadius:10,
+    resizeMode: 'cover',
+  }
+});

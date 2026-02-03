@@ -157,9 +157,6 @@ const HomeScreen = ({ route }) => {
               onPress={() =>
                 navigate('viewAppointment', {
                   appointmentId: firstAppointment?.id,
-                  patientId: patient?.id,
-                  doctorId: firstAppointment?.doctorId,
-                  specialityId: speciality?.id
                 })
               }
               style={styles.cardContainer}
@@ -201,7 +198,7 @@ const HomeScreen = ({ route }) => {
                       })}, ${new Date(firstAppointment.start).toLocaleTimeString([], {
                         hour: '2-digit',
                         minute: '2-digit',
-                      })}-${firstAppointment.end ? new Date(firstAppointment.end).toLocaleDateString([], {
+                      })}-${firstAppointment.end ? new Date(firstAppointment.end).toLocaleTimeString([], {
                         hour: '2-digit',
                         minute: '2-digit',
                       })

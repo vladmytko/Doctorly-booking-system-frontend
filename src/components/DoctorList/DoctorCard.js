@@ -60,10 +60,10 @@ const DoctorCard = ({id,name,image,specialityId,consultationFee,horizontal,style
     >
       <Image source={{uri:image}} style={[styles.image,!horizontal?{height:220}:{},imageStyle]}/>
       <View style={[{flexDirection:'row',justifyContent:'space-between',flexWrap:'wrap',padding:5},contentContainerStyle]}>
-        <Text style={styles.nameText}>{name}</Text>
+        <Text style={styles.nameText}>{props?.firstName}</Text>
         <View style={{flexDirection:'row',flexWrap:'wrap',gap:displayAll?8:2}}>
             <Image source={require('../../assets/img/star.png')} />
-            <Text>{props.rating}</Text>
+            <Text>{props.averageRating}</Text>
         </View>
         <View style={{flexDirection:'row',paddingVertical:5}}>
         {displayAll && <Text style={{paddingRight:10}}>{specialityTitle}</Text>}
