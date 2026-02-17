@@ -20,7 +20,7 @@ export const fetchClinicById = async (id) => {
         const { data } = await api.get(`${API_PATH.CLINIC}/by-id/${safeId}`, { headers });
         return data;
     } catch (err) {
-        console.error('Error fetching clinic:', err?.response?.data || err.message);
+        console.error('Error fetching clinic:', err?.response?.data || err.message || err.response.status);
         throw err;
     }
 };
