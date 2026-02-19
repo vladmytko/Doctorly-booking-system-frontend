@@ -9,70 +9,81 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const SearchScreen = () => {
   const navigation = useNavigation();
 
-  // REcents are stores in AsyncStorage, local react state (array of strings)
   const RECENT_KEY = 'recentSpecialitySearches';
   const [recents, setRecents] = useState([]);
-  const [token, setToken] = useState(null);
 
   // read your JWT from AsyncStorage 
-
-  useEffect(() => {
-    (async ()=> {
-        try {
-             const rawJwt = await AsyncStorage.getItem('jwt');
-             if(rawJwt) {
-                setToken(rawJwt);
-             }
-        } catch (e) {
-            console.error('Error reading token: ', e);
-        }
-    })();
-  }, []);
- 
-
-  // Loading recents on screen mount
+  const [token, setToken] = useState(null);
   useEffect(() => {
     (async () => {
       try {
-        const recentsSeaches = await AsyncStorage.getItem(RECENT_KEY);
-        if (recentsSeaches) {
-          const arr = JSON.parse(recentsSeaches);
+        const candidateKeys = ['accessToken', 'token', 'jwt', 'auth', 'AUTH_TOKEN'];
+        console.log("Token", candidateKeys)
+        
+        let raw = null;
+        for (const key of candidateKeys) {
+          const v = await AsyncStorage.getItem(key);
+          if (v) {
+            raw = v;
+            console.log(`Found token in storage key: ${key}`);
+            break;
+          }
+        }
+
+        if (raw) {
+          let jwt = raw;
+          try {
+            const obj = JSON.parse(raw);
+            jwt = obj?.accessToken || obj?.token || obj?.jwt || obj?.Authorization || raw;
+          } catch (_) {
+            // raw string token; keep as-is
+          }
+          // Normalize to an Authorization header value
+          if (jwt && !jwt.startsWith('Bearer ')) jwt = `Bearer ${jwt}`;
+
+          setToken(jwt);
+          console.log('Authorization header set from storage');
+        } else {
+          console.log('No token found in storage under known keys');
+        }
+      } catch (e) {
+        console.error('Error reading token:', e);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(RECENT_KEY);
+        if (raw) {
+          const arr = JSON.parse(raw);
           if (Array.isArray(arr)) setRecents(arr);
         }
       } catch (e) {
-        console.warn('Failed to load recents searches', e);
+        console.warn('Failed to load recents', e);
       }
     })();
   }, []);
 
   const { q, setQ, items, loading } = useSpecialitySuggestions(token);
 
-
-  // Stored as JSON string '["Cardiology","Dermatology"]'
-  const saveRecents = useCallback(async (next) => {
+  const persistRecents = async (next) => {
     try {
       await AsyncStorage.setItem(RECENT_KEY, JSON.stringify(next));
     } catch (e) {
       console.warn('Failed to persist recents', e);
     }
-  }, []);
+  };
 
-  const addRecent = useCallback(async (term) => {
+  const addRecent = async (term) => {
     const t = term.trim();
     if (!t) return;
+    const next = [t, ...recents.filter(r => r.toLowerCase() !== t.toLowerCase())].slice(0, 10);
+    setRecents(next);
+    await persistRecents(next);
+  };
 
-    // Build next list using the latest state (avoids stale `recents` and keeps deps stable)
-    let next;
-    setRecents((prev) => {
-      next = [t, ...prev.filter((r) => r.toLowerCase() !== t.toLowerCase())].slice(0, 10);
-      return next;
-    });
-
-    // Persist using the computed list
-    if (next) await saveRecents(next);
-  }, [saveRecents]);
-
-  // Crear UI instantly
   const clearRecents = async () => {
     try {
       setRecents([]);

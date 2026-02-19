@@ -65,8 +65,8 @@ export const fetchDoctorsBySpeciality = async ({specialityId, specialityTitle, p
     if(size !== undefined) params.size = size;
     if(sort) params.sort = sort;
 
-    console.log('Fetching fetchDoctorsBySpeciality URL:', `${api.defaults.baseURL}/doctors/speciality`, { headers, params});
-    const { data } = await api.get('/doctors/speciality', { headers, params});
+    console.log('Fetching fetchDoctorsBySpeciality URL:', `${api.defaults.baseURL}/doctors/search-by-speciality`, { headers, params});
+    const { data } = await api.get('/doctors/search-by-speciality', { headers, params});
 
     return Array.isArray(data?.content) ? data.content : [];
   } catch (err) {

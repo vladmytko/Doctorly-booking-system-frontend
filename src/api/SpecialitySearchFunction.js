@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import api from "./api";
+import { API_PATH } from './constant';
+import AsyncStorage from '@react-native-async-storage/async-storage'; 
 
 export function useSpecialitySuggestions(token) {
   const [q, setQ] = useState("");
@@ -31,8 +33,9 @@ export function useSpecialitySuggestions(token) {
     const t = setTimeout(async () => {
       setLoading(true);
       try {
-        const urlPath = `/specialities/search?q=${encodeURIComponent(trimmed)}&limit=10`;
-        const headers = token ? { Authorization: token } : undefined;
+        const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+        const urlPath = `${API_PATH.SPECIALITY}/search?q=${encodeURIComponent(trimmed)}&limit=10`;
+        
 
         // Useful for matching against backend logs
         console.log("Fetching URL:", `${api.defaults.baseURL}${urlPath}`);
@@ -52,5 +55,5 @@ export function useSpecialitySuggestions(token) {
     };
   }, [q, token]);
 
-  return { q, setQ, items, loading };
+  return { q, setQ, items, loading, };
 }
